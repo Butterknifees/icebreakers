@@ -5,6 +5,7 @@ import { GameRoom, GamePlayer } from '../../lib/types';
 import { PRESET_TASTE_PROFILES, generateSongsFromProfile } from '../../lib/mockProfiles';
 import { initiateSpotifyLogin } from '../../lib/spotifyAuth';
 import { updatePlayer, startPreviewPhase } from '../../lib/roomEngine';
+import { SpotifyConnectModal } from './SpotifyConnectModal';
 import { 
   Users, 
   Copy, 
@@ -15,10 +16,10 @@ import {
   Settings2, 
   Crown, 
   UserPlus, 
-  Play,
-  Share2,
-  Headphones,
-  CheckCircle2,
+  Play, 
+  Share2, 
+  Headphones, 
+  CheckCircle2, 
   Layers
 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [isAddingBot, setIsAddingBot] = useState(false);
+  const [isSpotifyModalOpen, setIsSpotifyModalOpen] = useState(false);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   const isHost = room.hostId === currentPlayer.id;
@@ -167,13 +169,20 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
 
           {/* Spotify Direct Connect Button */}
           <button
-            onClick={() => initiateSpotifyLogin(undefined, room.code)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold text-xs sm:text-sm rounded-xl transition shadow-lg hover:shadow-emerald-500/20 active:scale-95"
+            onClick={() => setIsSpotifyModalOpen(true)}
+            className="flex items-center gap-2 px-5 py-3 bg-[#1DB954] hover:bg-[#1ed760] text-black font-black text-xs sm:text-sm rounded-2xl transition shadow-lg hover:shadow-emerald-500/20 active:scale-95"
           >
             <Headphones className="w-4 h-4 fill-black" />
-            Connect Real Spotify
+            Connect Spotify / Pick Vibe
           </button>
         </div>
+
+        <SpotifyConnectModal
+          isOpen={isSpotifyModalOpen}
+          onClose={() => setIsSpotifyModalOpen(false)}
+          onSelectPlayer={(p) => onUpdatePlayer(p)}
+          roomCode={room.code}
+        />
 
         {/* Preset Taste Profiles Grid */}
         <div className="space-y-3">

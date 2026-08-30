@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createGameRoom } from '../lib/roomEngine';
 import { GamePlayer } from '../lib/types';
 import { PRESET_TASTE_PROFILES, generateSongsFromProfile } from '../lib/mockProfiles';
 import { CloudSyncModal } from '../components/game/CloudSyncModal';
+import { SpotifyConnectModal } from '../components/game/SpotifyConnectModal';
 import { 
   Music, 
   Users, 
@@ -16,73 +17,82 @@ import {
   Flame, 
   CheckCircle2, 
   Headphones, 
-  Radio, 
   ShieldCheck, 
-  Award,
-  Globe
+  Globe,
+  Radio
 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
-  const [selectedProfileId, setSelectedProfileId] = useState(PRESET_TASTE_PROFILES[0].id);
-  const [playerName, setPlayerName] = useState(PRESET_TASTE_PROFILES[0].name.split(' ')[0]);
+  const [activePlayer, setActivePlayer] = useState<GamePlayer | null>(null);
   const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
+  const [isSpotifyModalOpen, setIsSpotifyModalOpen] = useState(false);
 
-  const activeProfile = PRESET_TASTE_PROFILES.find(p => p.id === selectedProfileId) || PRESET_TASTE_PROFILES[0];
+  // Initialize or load active player
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-  const handleProfileSelect = (profileId: string) => {
-    const p = PRESET_TASTE_PROFILES.find(x => x.id === profileId);
-    if (p) {
-      setSelectedProfileId(profileId);
-      setPlayerName(p.name.split(' ')[0]);
+    const saved = localStorage.getItem('whose_track_active_player');
+    if (saved) {
+      try {
+        setActivePlayer(JSON.parse(saved));
+      } catch (e) {}
+    } else {
+      // Default initial player setup
+      const defaultProfile = PRESET_TASTE_PROFILES[0];
+      const newId = `player_${Math.random().toString(36).substring(2, 9)}`;
+      const songs = generateSongsFromProfile(defaultProfile, newId);
+
+      const initial: GamePlayer = {
+        id: newId,
+        name: defaultProfile.name.split(' ')[0],
+        avatar: defaultProfile.avatar,
+        isHost: true,
+        isReady: true,
+        spotifyConnected: false,
+        spotifyUsername: defaultProfile.genre,
+        topSongs: songs,
+        score: 0,
+        currentStreak: 0
+      };
+      localStorage.setItem('whose_track_active_player', JSON.stringify(initial));
+      setActivePlayer(initial);
     }
+  }, []);
+
+  const handlePlayerSelected = (player: GamePlayer) => {
+    setActivePlayer(player);
+    localStorage.setItem('whose_track_active_player', JSON.stringify(player));
   };
 
   const handleCreateRoom = () => {
-    const playerId = `host_${Math.random().toString(36).substring(2, 9)}`;
-    const topSongs = generateSongsFromProfile(activeProfile, playerId);
-
-    const hostPlayer: GamePlayer = {
-      id: playerId,
-      name: playerName || activeProfile.name.split(' ')[0],
-      avatar: activeProfile.avatar,
+    if (!activePlayer) return;
+    const host: GamePlayer = {
+      ...activePlayer,
       isHost: true,
-      isReady: true,
-      spotifyConnected: true,
-      spotifyUsername: `${activeProfile.genre} Taste`,
-      topSongs: topSongs,
-      score: 0,
-      currentStreak: 0
+      isReady: true
     };
-
-    localStorage.setItem('whose_track_active_player', JSON.stringify(hostPlayer));
-    const room = createGameRoom(hostPlayer);
-    router.push(`/room/${room.code}`);
+    localStorage.setItem('whose_track_active_player', JSON.stringify(host));
+    const room = createGameRoom(host);
+    
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    router.push(`${basePath}/room/${room.code}`);
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinCode.trim()) return;
-
-    const playerId = `player_${Math.random().toString(36).substring(2, 9)}`;
-    const topSongs = generateSongsFromProfile(activeProfile, playerId);
+    if (!joinCode.trim() || !activePlayer) return;
 
     const player: GamePlayer = {
-      id: playerId,
-      name: playerName || activeProfile.name.split(' ')[0],
-      avatar: activeProfile.avatar,
+      ...activePlayer,
       isHost: false,
-      isReady: true,
-      spotifyConnected: true,
-      spotifyUsername: `${activeProfile.genre} Taste`,
-      topSongs: topSongs,
-      score: 0,
-      currentStreak: 0
+      isReady: true
     };
-
     localStorage.setItem('whose_track_active_player', JSON.stringify(player));
-    router.push(`/room/${joinCode.trim().toUpperCase()}`);
+    
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    router.push(`${basePath}/room/${joinCode.trim().toUpperCase()}`);
   };
 
   return (
@@ -111,16 +121,22 @@ export default function HomePage() {
               title="Configure Online Play for different networks"
             >
               <Globe className="w-3.5 h-3.5 text-purple-400" />
-              <span>Online Setup</span>
+              <span>Online Sync (Firebase)</span>
             </button>
           </div>
         </div>
       </header>
 
+      {/* Modals */}
       <CloudSyncModal isOpen={isCloudModalOpen} onClose={() => setIsCloudModalOpen(false)} />
+      <SpotifyConnectModal
+        isOpen={isSpotifyModalOpen}
+        onClose={() => setIsSpotifyModalOpen(false)}
+        onSelectPlayer={handlePlayerSelected}
+      />
 
       {/* Hero Section */}
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
         <div className="text-center space-y-4 max-w-3xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-widest animate-pulse">
             <Sparkles className="w-4 h-4 text-emerald-400" />
@@ -128,76 +144,59 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
-            Listen to the track. <br />
+            Connect your Spotify. <br />
             <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
               Guess whose Top Song it is!
             </span>
           </h1>
 
           <p className="text-neutral-400 text-base sm:text-lg max-w-2xl mx-auto">
-            Connect your Spotify or pick a taste profile to load your Top 30 tracks. Compete with friends in real time, score speed points, and unlock 2x multipliers on shared hits!
+            Icebreakers automatically links with your Spotify account and analyzes your top 30 most-played songs. Listen to snippets with friends, score speed points, and discover shared music taste!
           </p>
         </div>
 
-        {/* Profile / Character Setup Card */}
-        <div className="bg-neutral-900/80 border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-emerald-400">
-            <Headphones className="w-4 h-4" />
-            Step 1: Choose Your Music Identity & Top 30 Roster
-          </div>
+        {/* Prominent Spotify Connect Hero Card */}
+        <div className="bg-gradient-to-r from-neutral-900 via-[#1DB954]/10 to-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#1DB954]/15 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                Your Player Name:
-              </label>
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-emerald-500 transition"
-                placeholder="Enter your name"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                Music Taste Preset (30 Songs):
-              </label>
-              <select
-                value={selectedProfileId}
-                onChange={(e) => handleProfileSelect(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-emerald-500 transition"
-              >
-                {PRESET_TASTE_PROFILES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.genre})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Active Profile Info Banner */}
-          <div className="flex items-center gap-4 bg-neutral-950/70 p-4 rounded-2xl border border-neutral-800/80">
-            <img
-              src={activeProfile.avatar}
-              alt={activeProfile.name}
-              className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500/60 flex-shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white text-sm">
-                  {activeProfile.genre}
-                </span>
-                <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                  30 Songs Loaded ✓
-                </span>
+          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <img
+                  src={activePlayer?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop'}
+                  alt={activePlayer?.name || 'Player'}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-[#1DB954] shadow-xl"
+                />
+                {activePlayer?.spotifyConnected && (
+                  <div className="absolute -bottom-1 -right-1 bg-[#1DB954] text-black p-1 rounded-full shadow">
+                    <CheckCircle2 className="w-4 h-4 fill-black text-white" />
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-neutral-400 mt-1 line-clamp-1">
-                {activeProfile.description}
-              </p>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-white">
+                    {activePlayer?.name || 'Your Music Profile'}
+                  </h3>
+                  <span className="text-xs bg-[#1DB954]/20 text-[#1DB954] font-bold px-2.5 py-0.5 rounded-full border border-[#1DB954]/30">
+                    {activePlayer?.spotifyConnected ? 'Spotify Linked ✓' : 'Profile Active'}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+                  {activePlayer?.topSongs?.length || 30} Top Tracks Loaded • Ready for Guessing Rounds
+                </p>
+              </div>
             </div>
+
+            {/* Modal Trigger Button */}
+            <button
+              onClick={() => setIsSpotifyModalOpen(true)}
+              className="w-full md:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 bg-[#1DB954] hover:bg-[#1ed760] text-black font-black text-xs sm:text-sm uppercase tracking-wider rounded-2xl transition shadow-lg shadow-[#1DB954]/20 active:scale-95 flex-shrink-0"
+            >
+              <Headphones className="w-4 h-4 fill-black" />
+              {activePlayer?.spotifyConnected ? 'Switch Spotify Account' : 'Connect Your Spotify'}
+            </button>
           </div>
         </div>
 
@@ -213,7 +212,7 @@ export default function HomePage() {
                 Create a New Room
               </h2>
               <p className="text-neutral-400 text-sm">
-                Get a unique 6-character room code. Invite friends to link their accounts and play together in real time!
+                Get a unique 6-character room code. Invite friends to connect their Spotify and play together in real time!
               </p>
             </div>
 
@@ -262,7 +261,7 @@ export default function HomePage() {
         </div>
 
         {/* Feature Highlights */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-4">
           <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-2xl p-5 space-y-2">
             <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
               <Zap className="w-4 h-4" />

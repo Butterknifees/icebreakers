@@ -2,7 +2,7 @@ import { GameSong } from './types';
 import { resolveItunesAudio } from './itunesResolver';
 
 const SPOTIFY_CLIENT_ID_KEY = 'spotify_custom_client_id';
-export const DEFAULT_SPOTIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || '';
+export const DEFAULT_SPOTIFY_CLIENT_ID = 'e65365c6630148338c22921a48e3552d';
 
 export function getStoredSpotifyClientId(): string {
   if (typeof window !== 'undefined') {

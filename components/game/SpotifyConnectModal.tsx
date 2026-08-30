@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { initiateSpotifyLogin } from '../../lib/spotifyAuth';
+import React, { useState, useEffect } from 'react';
+import { initiateSpotifyLogin, getStoredSpotifyClientId, setStoredSpotifyClientId } from '../../lib/spotifyAuth';
 import { PRESET_TASTE_PROFILES, generateSongsFromProfile, PresetTasteProfile } from '../../lib/mockProfiles';
 import { GamePlayer } from '../../lib/types';
 import { 
@@ -11,9 +11,10 @@ import {
   CheckCircle2, 
   X, 
   ArrowRight, 
-  Radio,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Key,
+  Info
 } from 'lucide-react';
 
 interface SpotifyConnectModalProps {
@@ -30,13 +31,24 @@ export const SpotifyConnectModal: React.FC<SpotifyConnectModalProps> = ({
   roomCode
 }) => {
   const [activeTab, setActiveTab] = useState<'spotify' | 'guest'>('spotify');
+  const [clientId, setClientId] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [selectedGuestProfile, setSelectedGuestProfile] = useState<PresetTasteProfile>(PRESET_TASTE_PROFILES[0]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setClientId(getStoredSpotifyClientId());
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSpotifyConnect = () => {
-    initiateSpotifyLogin(undefined, roomCode);
+    if (clientId.trim()) {
+      setStoredSpotifyClientId(clientId.trim());
+    }
+    initiateSpotifyLogin(clientId.trim() || undefined, roomCode);
   };
 
   const handleGuestSubmit = (e: React.FormEvent) => {
@@ -63,9 +75,13 @@ export const SpotifyConnectModal: React.FC<SpotifyConnectModalProps> = ({
     onClose();
   };
 
+  const redirectUri = typeof window !== 'undefined'
+    ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH || ''}/callback`
+    : 'https://butterknifees.github.io/icebreakers/callback';
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 relative overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Glows */}
         <div className="absolute -top-20 -left-20 w-60 h-60 bg-[#1DB954]/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -right-20 w-60 h-60 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -131,17 +147,59 @@ export const SpotifyConnectModal: React.FC<SpotifyConnectModalProps> = ({
               <ul className="text-xs text-neutral-300 space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="text-[#1DB954] font-bold">1.</span>
-                  <span>Click below to log in securely with your Spotify account.</span>
+                  <span>Click below to authenticate securely with Spotify.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#1DB954] font-bold">2.</span>
-                  <span>Icebreakers automatically fetches your <strong>top 30 most-listened tracks</strong>.</span>
+                  <span>Icebreakers automatically imports your <strong>top 30 most-listened tracks</strong>.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-[#1DB954] font-bold">3.</span>
-                  <span>Your friends will hear snippets and guess if it's from your rotation!</span>
+                  <span>Songs are queued into the guessing rounds with 30s audio previews!</span>
                 </li>
               </ul>
+            </div>
+
+            {/* Spotify Client ID Configuration Toggle */}
+            <div className="bg-neutral-950/60 p-4 rounded-2xl border border-neutral-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-amber-400" />
+                  Spotify Developer App Client ID
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowConfig(!showConfig)}
+                  className="text-[11px] text-emerald-400 hover:underline"
+                >
+                  {showConfig ? 'Hide Guide' : 'Setup Guide (1-min)'}
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                placeholder="Paste your Spotify Client ID..."
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-[#1DB954] transition"
+              />
+
+              {showConfig && (
+                <div className="text-[11px] text-neutral-300 space-y-2 pt-2 border-t border-neutral-800">
+                  <p>
+                    1. Go to <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noreferrer" className="text-[#1DB954] underline inline-flex items-center gap-0.5">Spotify Developer Dashboard <ExternalLink className="w-2.5 h-2.5" /></a> and click <strong>Create App</strong>.
+                  </p>
+                  <p>
+                    2. In App Settings, add this exact <strong>Redirect URI</strong>:
+                  </p>
+                  <div className="bg-neutral-900 p-2 rounded-lg font-mono text-[10px] text-emerald-400 break-all select-all border border-neutral-800">
+                    {redirectUri}
+                  </div>
+                  <p>
+                    3. Copy your <strong>Client ID</strong> and paste it into the box above.
+                  </p>
+                </div>
+              )}
             </div>
 
             <button

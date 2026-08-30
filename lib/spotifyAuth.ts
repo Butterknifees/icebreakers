@@ -2,8 +2,21 @@ import { GameSong } from './types';
 import { resolveItunesAudio } from './itunesResolver';
 
 const SPOTIFY_CLIENT_ID_KEY = 'spotify_custom_client_id';
-// Default public demo client ID or user-provided
-export const DEFAULT_SPOTIFY_CLIENT_ID = 'e9d1a8f90eb044708709322bca6df90e'; 
+export const DEFAULT_SPOTIFY_CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID || '';
+
+export function getStoredSpotifyClientId(): string {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem(SPOTIFY_CLIENT_ID_KEY);
+    if (custom) return custom;
+  }
+  return DEFAULT_SPOTIFY_CLIENT_ID;
+}
+
+export function setStoredSpotifyClientId(id: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(SPOTIFY_CLIENT_ID_KEY, id.trim());
+  }
+}
 
 export const SPOTIFY_SCOPES = [
   'user-top-read',
@@ -47,8 +60,13 @@ export async function generateCodeChallenge(codeVerifier: string): Promise<strin
 /**
  * Initiates Spotify PKCE Login redirect
  */
-export async function initiateSpotifyLogin(clientId: string = DEFAULT_SPOTIFY_CLIENT_ID, returnRoomCode?: string) {
+export async function initiateSpotifyLogin(clientId?: string, returnRoomCode?: string) {
   if (typeof window === 'undefined') return;
+
+  const targetClientId = clientId || getStoredSpotifyClientId();
+  if (!targetClientId) {
+    console.error('No Spotify Client ID configured');
+  }
 
   const verifier = generateRandomString(64);
   const challenge = await generateCodeChallenge(verifier);
@@ -62,7 +80,7 @@ export async function initiateSpotifyLogin(clientId: string = DEFAULT_SPOTIFY_CL
 
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: clientId,
+    client_id: targetClientId,
     scope: SPOTIFY_SCOPES,
     code_challenge_method: 'S256',
     code_challenge: challenge,
@@ -77,8 +95,10 @@ export async function initiateSpotifyLogin(clientId: string = DEFAULT_SPOTIFY_CL
 /**
  * Exchanges auth code for Spotify Access Token
  */
-export async function exchangeCodeForToken(code: string, clientId: string = DEFAULT_SPOTIFY_CLIENT_ID): Promise<string | null> {
+export async function exchangeCodeForToken(code: string, clientId?: string): Promise<string | null> {
   if (typeof window === 'undefined') return null;
+
+  const targetClientId = clientId || getStoredSpotifyClientId();
 
   const verifier = localStorage.getItem('spotify_pkce_verifier');
   if (!verifier) {
@@ -93,7 +113,7 @@ export async function exchangeCodeForToken(code: string, clientId: string = DEFA
     grant_type: 'authorization_code',
     code: code,
     redirect_uri: redirectUri,
-    client_id: clientId,
+    client_id: targetClientId || '',
     code_verifier: verifier
   });
 

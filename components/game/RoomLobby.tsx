@@ -47,7 +47,7 @@ export const RoomLobby: React.FC<RoomLobbyProps> = ({
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-      const url = `${window.location.origin}${basePath}/room/${room.code}`;
+      const url = `${window.location.origin}${basePath}/room?code=${room.code}`;
       navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);

@@ -28,7 +28,19 @@ interface RoomClientProps {
 
 export const RoomClient: React.FC<RoomClientProps> = ({ roomCode }) => {
   const router = useRouter();
-  const code = roomCode ? roomCode.toUpperCase() : '';
+  const [code, setCode] = useState<string>(roomCode ? roomCode.toUpperCase() : '');
+
+  useEffect(() => {
+    if (roomCode) {
+      setCode(roomCode.toUpperCase());
+    } else if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryCode = urlParams.get('code');
+      if (queryCode) {
+        setCode(queryCode.toUpperCase());
+      }
+    }
+  }, [roomCode]);
 
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<GamePlayer | null>(null);

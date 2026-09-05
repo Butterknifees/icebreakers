@@ -73,11 +73,8 @@ export default function HomePage() {
       isHost: true,
       isReady: true
     };
-    localStorage.setItem('whose_track_active_player', JSON.stringify(host));
     const room = createGameRoom(host);
-    
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    router.push(`${basePath}/room/${room.code}`);
+    router.push(`/room?code=${room.code}`);
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
@@ -90,9 +87,7 @@ export default function HomePage() {
       isReady: true
     };
     localStorage.setItem('whose_track_active_player', JSON.stringify(player));
-    
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-    router.push(`${basePath}/room/${joinCode.trim().toUpperCase()}`);
+    router.push(`/room?code=${joinCode.trim().toUpperCase()}`);
   };
 
   return (
